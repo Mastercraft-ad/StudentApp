@@ -1,0 +1,362 @@
+Below is a single, copy-paste **comprehensive prompt** you can feed into Cursor (or another code-generation assistant) to generate the **entire StudentDrive MVP frontend** using **React (Vite) + TypeScript**, **Tailwind CSS** (with exact StudentDrive brand colors), and **shadcn/ui** components. It’s explicit about structure, API contracts, accessibility, testing, low-bandwidth optimizations, AI tool stubs, and deliverable format. Use this as your master prompt — it tells the generator what to scaffold first, how each feature should behave, and what acceptance criteria/tests to include.
+
+---
+
+# PROMPT — Build StudentDrive MVP Frontend (React + TypeScript + Vite + Tailwind + shadcn/ui)
+
+You are a senior frontend engineer. Generate a **complete, production-ready React (Vite) frontend** for the StudentDrive MVP. Use **TypeScript** everywhere. Style with **Tailwind CSS** and **shadcn/ui** components and extend them to match StudentDrive brand colors (provided below). The app must be accessible (WCAG AA), mobile-first, and optimized for low-bandwidth use.
+
+**Brand colors (use exactly):**
+
+* Primary Green: `#1DB954`
+* Dark Navy: `#0B1B3C`
+* Sky Blue / Teal tint: `#A6D5D5`
+* White: `#FFFFFF`
+* Light Gray: `#F5F6F8`
+* Muted Gray: `#E5E7EB`
+* Black (text): `#000000`
+
+---
+
+## Must-have Deliverables (for each major task)
+
+For Cursor/codegen produce the following artifacts (all TypeScript/.tsx unless noted):
+
+1. **Project skeleton**: `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `tailwind.config.js`, `index.html`.
+2. **Global styles**: `src/styles/globals.css` with CSS variables for brand colors and Tailwind import.
+3. **App shell**: `src/main.tsx`, `src/App.tsx`, and top-level routes in `src/routes.tsx`.
+4. **Auth & onboarding flows**: pages + components with API integration and local mocks.
+5. **All pages & components** listed below (complete with props typing, aria attributes, loading/error states).
+6. **API client**: `src/services/api.ts` (Axios) with typed interfaces and centralized error handling.
+7. **State management**: React Query for server state, Zustand for UI state.
+8. **Mocking**: MSW handlers for all API endpoints for dev & tests.
+9. **PDF viewer**: `src/components/PDFViewer.tsx` using `pdfjs-dist`, vertical page render + page count detection.
+10. **AI tools UI**: flashcard, quiz, summarizer, mindmap pages (call API endpoints; editable outputs).
+11. **Exam engine**: timed mock exam UI, autosave, localStorage fallback, result analytics.
+12. **Scheduler & spaced repetition UI**: learning path creation, review queue UI using SM-2 algorithm client-side.
+13. **Monetization components**: subscriptions/pricing, mock checkout flow.
+14. **Analytics & dashboard**: performance cards, progress charts (use simple SVG sparklines or recharts).
+15. **Shared UI**: header, footer, sidebar, protected route wrapper (role-based), low-bandwidth toggle.
+16. **Tests**: Vitest + React Testing Library unit tests for core components, integration tests for critical flows (signup → onboarding → create path → take exam).
+17. **Storybook**: stories for Buttons, Cards, UploadForm, PDFViewer, Flashcards, ExamTimer.
+18. **CI config**: `.github/workflows/ci.yml` to run lint, tests, build.
+19. **README (frontend)** with run/build/test instructions and sample `.env`.
+20. **Output format**: A file list / file tree + full content of each file created/modified.
+
+---
+
+## Tech & Libraries to use
+
+* React 18 + TypeScript
+* Vite
+* Tailwind CSS (configure with brand colors)
+* shadcn/ui components
+* React Router v6
+* React Query (TanStack Query)
+* Zustand
+* Axios
+* MSW for dev + tests
+* pdfjs-dist for PDFs
+* react-flow or d3 for mindmaps (prefer react-flow for UX)
+* vitest + @testing-library/react
+* Storybook
+* date-fns
+* optional: recharts for charts (or minimal SVG)
+* husky, lint-staged, eslint, prettier
+
+---
+
+## Folder structure to produce
+
+```
+/frontend
+├─ package.json
+├─ vite.config.ts
+├─ tailwind.config.js
+├─ src/
+│  ├─ main.tsx
+│  ├─ App.tsx
+│  ├─ routes.tsx
+│  ├─ styles/globals.css
+│  ├─ components/
+│  │  ├─ Header.tsx
+│  │  ├─ Footer.tsx
+│  │  ├─ Sidebar.tsx
+│  │  ├─ PDFViewer.tsx
+│  │  ├─ UploadForm.tsx
+│  │  ├─ FlashcardEditor.tsx
+│  │  └─ ...
+│  ├─ pages/
+│  │  ├─ Auth/
+│  │  ├─ Onboarding/
+│  │  ├─ Dashboard/
+│  │  ├─ Library/
+│  │  ├─ AI/
+│  │  ├─ Exams/
+│  │  └─ Subscriptions/
+│  ├─ services/
+│  │  └─ api.ts
+│  ├─ hooks/
+│  │  └─ useAuth.ts,useExamTimer.ts...
+│  ├─ store/
+│  │  └─ uiStore.ts
+│  ├─ types/
+│  │  └─ models.ts
+│  └─ mocks/
+│     └─ mswHandlers.ts
+└─ README.md
+```
+
+---
+
+## API Contracts (Laravel backend — frontend must assume these endpoints)
+
+> Use `import.meta.env.VITE_API_URL` as base.
+
+**Auth**
+
+* `POST /api/auth/register` `{name,email,password}` → `{ user, token }`
+* `POST /api/auth/login` `{email,password}` → `{ user, token }`
+* `POST /api/auth/logout`
+* `GET /api/auth/me` → `User`
+
+**Onboarding**
+
+* `PUT /api/users/:id/onboarding` `{ program, institution_id, level, discovered_via, goals }`
+
+**Institutions**
+
+* `GET /api/institutions`
+* `GET /api/institutions/:id`
+
+**Courses & Content**
+
+* `GET /api/courses`
+* `GET /api/courses/:id`
+* `POST /api/courses` (multipart)
+* `GET /api/contents` ?type=\[notes|past-exams|questions]
+* `POST /api/contents` (multipart) `{title,type,metadata}` returns content object with `file_url`
+* `GET /api/contents/:id/download` — returns signed URL or file stream
+* `POST /api/contents/:id/rate` `{rating:int, feedback?:string}`
+
+**AI Tools**
+
+* `POST /api/ai/flashcards` `{ content_ids: number[] }` → `{ flashcards: Flashcard[] }`
+* `POST /api/ai/quiz` `{ content_ids?: number[], youtube_url?: string }` → `{ quiz }`
+* `POST /api/ai/summarize` `{ content_id | text }` → `{ summary }`
+* `POST /api/ai/mindmap` `{ content_ids }` → `{ mindmap }`
+
+**Exams & Results**
+
+* `POST /api/exams` `{settings}` → `{ exam_id }`
+* `GET /api/exams/:id`
+* `POST /api/exams/:id/submit` `{answers}` → `{score, breakdown, weak_topics}`
+
+**Learning Paths & Scheduling**
+
+* `POST /api/learning-paths` `{target_date, topics, daily_hours}` → `{ schedule }`
+* `GET /api/learning-paths/:id`
+
+**Subscriptions**
+
+* `GET /api/subscriptions/plans`
+* `POST /api/subscriptions` `{ plan_id, payment_token }`
+
+**Analytics**
+
+* `GET /api/dashboard/summary` → `{ strengths, weaknesses, time_spent, readiness }`
+
+---
+
+## TypeScript models (provide `src/types/models.ts`)
+
+Create and export interfaces for:
+
+* `User`, `Institution`, `Course`, `Content`, `Flashcard`, `Exam`, `ExamResult`, `LearningPath`, `Subscription`, `MindMapNode`, `PerformanceSummary`.
+
+---
+
+## Pages & Components — full list with behavior & acceptance criteria
+
+> For each page / component you must implement: UI, data fetching (React Query), loading/error state, mobile responsive styles, and a unit test.
+
+### 1) Auth & Onboarding
+
+* `pages/Auth/Register.tsx` — registration form, validation, sends to `/api/auth/register`, on success redirect to onboarding.
+* `pages/Auth/Login.tsx` — login form + remember me; store token in http-only cookie via backend OR in memory for mocks.
+* `pages/Onboarding/Questionnaire.tsx` — collects: `program`, `institution_id` (searchable dropdown), `level`, `discovered_via`, `goals`. On submit call onboarding endpoint. Acceptance: updates user profile and shows success toaster.
+
+### 2) Dashboard
+
+* `pages/Dashboard/StudentDashboard.tsx` — shows recommended courses, saved content, quick performance card (strengths/weaknesses), time spent, progress toward target. Acceptance: data loaded from `/api/dashboard/summary` and clickable items navigate to detail pages.
+
+### 3) Content Library
+
+* `pages/Library/Index.tsx` — list by type with filters (institution, program, popularity), infinite scroll.
+* `components/UploadForm.tsx` — multi-file upload (PDF, PPT, images), client validation (max size, allowed types), progress bar, resumable behavior (simulate), preview thumbnails, and sends multipart POST to `/api/contents`. Acceptance: uploaded content appears on list and is rateable.
+
+### 4) Content Card & Rating
+
+* `components/ContentCard.tsx` — preview, rating stars (optimistic update), download button (calls `/api/contents/:id/download`), report flag. Acceptance: ratings update UI instantly with optimistic update and roll back on error.
+
+### 5) PDFViewer
+
+* `components/PDFViewer.tsx` — vertical pages, lazy page rendering, page count detection. Must accept URL and render pages with virtualization. Acceptance: renders first page quickly and shows page count.
+
+### 6) AI Tools
+
+* `pages/AI/FlashcardGenerator.tsx` — select contents, POST `/api/ai/flashcards`, display editable flashcards, allow save to library.
+* `pages/AI/QuizGenerator.tsx` — generate quiz from content or YouTube link, preview questions, allow customization, generate exam.
+* `pages/AI/Summarizer.tsx` — show summary and allow copy/export.
+* `pages/AI/MindMap.tsx` — use `react-flow` to render returned mindmap JSON and allow export.
+
+Acceptance for AI: show spinner, token/limit warnings, allow edit, and persist generated object to local library (mock save).
+
+### 7) Exams & Practice
+
+* `pages/Exams/CreateMock.tsx` — create exam settings (duration, number of questions, topics).
+* `pages/Exams/TakeExam.tsx` — timed single-question-per-screen UI, autosave answers to server every 15s and localStorage, keyboard nav (n/p), timer persists on reload, submit returns `ExamResult`.
+* `pages/Exams/Results.tsx` — show score, question breakdown, weak topics, recommended contents.
+
+### 8) Learning Paths & Scheduler
+
+* `pages/StudyPlanner/CreatePath.tsx` — set target date, daily hours, topics. Call `/api/learning-paths` to get scheduled tasks.
+* `components/Scheduler/TaskList.tsx` — daily task list with snooze, done toggle.
+* `components/SpacedRepetition/ReviewQueue.tsx` — SM-2 algorithm client-side to queue items; sync with server.
+
+### 9) Subscriptions / Monetization
+
+* `pages/Subscriptions/Plans.tsx` — show tiers (Free, Monthly, Semester, Yearly). Mock purchase flow in `components/Payments/Checkout.tsx`. Acceptance: mock subscribe/unsubscribe and update user subscription state.
+
+### 10) Analytics & Feedback
+
+* `components/Analytics/PerformanceCard.tsx` — strengths, weaknesses, readiness progress bar.
+* `pages/Analytics/UserProgress.tsx` — charts (time spent per week), list of recent activity.
+
+### 11) Shared UI & Helpers
+
+* `components/Header.tsx` — top nav, search box (debounced), role switcher for dev (student/institution/admin).
+* `components/ProtectedRoute.tsx` — role-based routing.
+* `components/LowBandwidthToggle.tsx` — toggles low-bandwidth mode (Zustand persisted).
+* `hooks/useAuth.ts`, `hooks/useExamTimer.ts`, etc.
+
+---
+
+## Performance & Low-Bandwidth rules
+
+* Provide a global low-bandwidth toggle (Zustand) that:
+
+  * Disables autoplay of video.
+  * Loads low-res images (`?quality=30`) or placeholders.
+  * Limits AI prefetching.
+* Lazy-load route components with `React.lazy` + `Suspense`.
+* Use `loading="lazy"` and `srcset` for images.
+* Virtualize long lists (e.g., `react-window`) for library lists.
+
+---
+
+## Testing requirements
+
+* Unit tests for every major component using Vitest + React Testing Library.
+* Integration tests for at least:
+
+  * Register → Onboarding → Dashboard (happy path).
+  * Upload content → Rate content → Download content.
+  * Create exam → Take exam (simulate timer) → Submit → See results.
+* Mock network with MSW in tests.
+* Provide `npm run test:coverage`.
+
+---
+
+## Storybook
+
+* Add stories for Buttons, Forms, ContentCard, UploadForm, PDFViewer, FlashcardEditor, ExamTimer.
+* Configure Storybook with tailwind.
+
+---
+
+## Accessibility
+
+* All interactive controls must be keyboard accessible.
+* Provide `aria-live` regions for exam timer and dynamic updates.
+* Color contrast must meet WCAG AA using brand colors or high-contrast variants.
+* Provide skip-to-content link.
+
+---
+
+## Security & Best Practices
+
+* Do not store API keys in frontend code; use backend for sensitive operations.
+* For downloads use signed URLs from backend.
+* For payments use secure tokenization; provide mock flow for dev.
+
+---
+
+## CI / CD
+
+* Provide `.github/workflows/ci.yml` to run:
+
+  * `npm ci`
+  * `npm run lint`
+  * `npm run test`
+  * `npm run build`
+* Provide a `Dockerfile.frontend` for containerized builds.
+
+---
+
+## Acceptance checklist (final)
+
+* [ ] Project scaffolded (Vite + TS + Tailwind + shadcn + Storybook)
+* [ ] Tailwind config uses StudentDrive brand exact colors
+* [ ] Auth + Onboarding flows implemented & tested
+* [ ] Content library upload/download with progress & rating
+* [ ] PDF viewer vertical render + page count detection
+* [ ] AI tool UIs + mock API integration
+* [ ] Exam engine (timer, autosave, submission & results)
+* [ ] Scheduler & spaced repetition queue UI
+* [ ] Subscriptions UI & mock checkout
+* [ ] Dashboard analytics and progress
+* [ ] Low-bandwidth mode & accessibility checks
+* [ ] Unit + Integration tests, MSW mocks
+* [ ] Storybook stories for key components
+* [ ] README and CI workflow
+
+---
+
+## Output format required from the generator
+
+When generating code produce:
+
+1. **File tree** of created/modified files.
+2. For **each file**: full file contents (including imports).
+3. For **each component/page**: a one-line description and the acceptance test(s).
+4. **MSW handlers** file and sample fixture data.
+5. **Sample `.env`** for frontend (no secrets).
+6. **Commands** to run dev, test, storybook, and build.
+7. **Short dev notes** on how to connect to the Laravel backend (env vars, CORS notes, sanctum vs token).
+8. **One-sentence commit message** per major file group created (useful for PRs).
+
+---
+
+## Implementation order (scaffold first)
+
+1. Project scaffold + tailwind config + brand colors.
+2. API client + types + MSW mocks.
+3. Auth + Onboarding pages + tests.
+4. Header/Footer + routing + protected route.
+5. Content library (list + upload form) + PDF viewer.
+6. Dashboard + Analytics cards.
+7. AI tools (stubs + UI) + export/save.
+8. Exam engine + scheduler + spaced repetition.
+9. Subscription pages + mock checkout.
+10. Storybook + tests + CI.
+
+---
+
+## Final note to generator
+
+Generate code in small logical commits (as file groups). Ensure every component includes accessible markup and test(s). Mock all backend calls with MSW so the app runs end-to-end locally without a backend. Use `import.meta.env.VITE_API_URL` as the base; default to `http://localhost:8000` in `.env`.
+
+---
+
+Paste the entire prompt above into Cursor or your code generation tool. Once you get the scaffold back, I can take the next step: either break the scaffold into sprint-ready tickets, generate the initial code files, or start implementing a specific feature (e.g., onboarding + content upload).
