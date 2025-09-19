@@ -35,7 +35,23 @@ import {
 } from '@/types/models'
 
 // API Configuration  
-const API_BASE_URL = (import.meta.env as any)?.VITE_API_URL || 'http://localhost:8000'
+const getApiBaseUrl = () => {
+  // Check if we have an environment variable
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // In Replit environment, construct API URL from current domain
+  if (typeof window !== 'undefined' && window.location.hostname.includes('replit.dev')) {
+    const currentHost = window.location.hostname
+    return `https://${currentHost}:8000`
+  }
+  
+  // Fallback to localhost for local development
+  return 'http://localhost:8000'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 const API_TIMEOUT = 30000 // 30 seconds
 
 class ApiClient {
