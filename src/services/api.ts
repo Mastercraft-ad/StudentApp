@@ -1,6 +1,6 @@
 // StudentDrive MVP - API Client Service for Laravel Backend Integration
 
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios'
+import axios, { AxiosInstance, AxiosError } from 'axios'
 import {
   User,
   Institution,
@@ -35,7 +35,7 @@ import {
 } from '@/types/models'
 
 // API Configuration  
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000'
+const API_BASE_URL = (import.meta.env as any)?.VITE_API_URL || 'http://localhost:8000'
 const API_TIMEOUT = 30000 // 30 seconds
 
 class ApiClient {
