@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiClient } from '@/services/api'
 
 export interface UserStats {
   studyStreak: number
@@ -26,12 +28,6 @@ export interface ScheduleItem {
   type: 'study' | 'practice' | 'quiz' | 'review'
 }
 
-const STORAGE_KEYS = {
-  USER_STATS: 'studentdrive_user_stats',
-  RECENT_ACTIVITY: 'studentdrive_recent_activity',
-  TODAY_SCHEDULE: 'studentdrive_today_schedule',
-}
-
 const DEFAULT_STATS: UserStats = {
   studyStreak: 0,
   totalStudyTime: 0,
@@ -43,58 +39,33 @@ const DEFAULT_STATS: UserStats = {
 }
 
 export function useUserStats() {
-  const [stats, setStats] = useState<UserStats>(DEFAULT_STATS)
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
+  
+  // Fetch user stats from API
+  const { data: stats = DEFAULT_STATS, isLoading, error } = useQuery({
+    queryKey: ['userStats'],
+    queryFn: async () => {
+      try {
+        return await apiClient.getUserStats()
+      } catch (error) {
+        console.warn('Failed to fetch user stats, using defaults:', error)
+        return DEFAULT_STATS
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+  })
 
-  useEffect(() => {
-    loadStats()
-  }, [])
-
-  const loadStats = () => {
-    try {
-      const savedStats = localStorage.getItem(STORAGE_KEYS.USER_STATS)
-      const savedActivity = localStorage.getItem(STORAGE_KEYS.RECENT_ACTIVITY)
-      const savedSchedule = localStorage.getItem(STORAGE_KEYS.TODAY_SCHEDULE)
-
-      const loadedStats = savedStats ? JSON.parse(savedStats) : DEFAULT_STATS
-      const loadedActivity = savedActivity ? JSON.parse(savedActivity) : []
-      const loadedSchedule = savedSchedule ? JSON.parse(savedSchedule) : []
-
-      setStats({
-        ...loadedStats,
-        recentActivity: loadedActivity.map((item: any) => ({
-          ...item,
-          timestamp: new Date(item.timestamp)
-        })),
-        todaySchedule: loadedSchedule,
-      })
-    } catch (error) {
-      console.error('Error loading user stats:', error)
-      setStats(DEFAULT_STATS)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const updateStats = (newStats: Partial<UserStats>) => {
-    const updatedStats = { ...stats, ...newStats }
-    setStats(updatedStats)
-    
-    try {
-      localStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify({
-        studyStreak: updatedStats.studyStreak,
-        totalStudyTime: updatedStats.totalStudyTime,
-        examAverage: updatedStats.examAverage,
-        goalsCompleted: updatedStats.goalsCompleted,
-        totalGoals: updatedStats.totalGoals,
-      }))
-      
-      localStorage.setItem(STORAGE_KEYS.RECENT_ACTIVITY, JSON.stringify(updatedStats.recentActivity))
-      localStorage.setItem(STORAGE_KEYS.TODAY_SCHEDULE, JSON.stringify(updatedStats.todaySchedule))
-    } catch (error) {
-      console.error('Error saving user stats:', error)
-    }
-  }
+  // Mutations for updating stats
+  const updateStatsMutation = useMutation({
+    mutationFn: async (updates: Partial<UserStats>) => {
+      // For now, optimistically update - in real app, you'd have specific endpoints
+      return { ...stats, ...updates }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['userStats'], data)
+    },
+  })
 
   const addActivity = (activity: Omit<ActivityItem, 'id' | 'timestamp'>) => {
     const newActivity: ActivityItem = {
@@ -104,7 +75,7 @@ export function useUserStats() {
     }
 
     const updatedActivity = [newActivity, ...stats.recentActivity].slice(0, 10) // Keep only latest 10
-    updateStats({ recentActivity: updatedActivity })
+    updateStatsMutation.mutate({ recentActivity: updatedActivity })
   }
 
   const addScheduleItem = (item: Omit<ScheduleItem, 'id'>) => {
@@ -114,11 +85,11 @@ export function useUserStats() {
     }
 
     const updatedSchedule = [...stats.todaySchedule, newItem]
-    updateStats({ todaySchedule: updatedSchedule })
+    updateStatsMutation.mutate({ todaySchedule: updatedSchedule })
   }
 
   const incrementStudyTime = (hours: number) => {
-    updateStats({ 
+    updateStatsMutation.mutate({ 
       totalStudyTime: stats.totalStudyTime + hours,
       studyStreak: stats.studyStreak + 1
     })
@@ -130,19 +101,23 @@ export function useUserStats() {
       ? score 
       : Math.round((stats.examAverage + score) / 2)
     
-    updateStats({ examAverage: newAverage })
+    updateStatsMutation.mutate({ examAverage: newAverage })
   }
 
   const completeGoal = () => {
-    updateStats({ 
+    updateStatsMutation.mutate({ 
       goalsCompleted: stats.goalsCompleted + 1 
     })
   }
 
   const addGoal = () => {
-    updateStats({ 
+    updateStatsMutation.mutate({ 
       totalGoals: stats.totalGoals + 1 
     })
+  }
+
+  const updateStats = (updates: Partial<UserStats>) => {
+    updateStatsMutation.mutate(updates)
   }
 
   return {

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiClient } from '@/services/api'
 
 export interface Content {
   id: string
@@ -22,8 +24,6 @@ export interface ContentFilters {
   sortBy: 'recent' | 'popular' | 'rating'
 }
 
-const STORAGE_KEY = 'studentdrive_content_library'
-
 const DEFAULT_FILTERS: ContentFilters = {
   searchQuery: '',
   selectedType: 'all',
@@ -31,84 +31,96 @@ const DEFAULT_FILTERS: ContentFilters = {
 }
 
 export function useContentLibrary() {
-  const [contents, setContents] = useState<Content[]>([])
+  const queryClient = useQueryClient()
   const [filters, setFilters] = useState<ContentFilters>(DEFAULT_FILTERS)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    loadContents()
-  }, [])
-
-  const loadContents = () => {
-    try {
-      const savedContents = localStorage.getItem(STORAGE_KEY)
-      if (savedContents) {
-        const parsed = JSON.parse(savedContents)
-        setContents(parsed.map((content: any) => ({
-          ...content,
-          uploadedAt: new Date(content.uploadedAt)
-        })))
+  
+  // Fetch contents from API
+  const { data: allContents = [], isLoading, error } = useQuery({
+    queryKey: ['contents'],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.getContents()
+        return response.data || []
+      } catch (error) {
+        console.warn('Failed to fetch contents, using empty array:', error)
+        return []
       }
-    } catch (error) {
-      console.error('Error loading contents:', error)
-    } finally {
-      setIsLoading(false)
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: 1,
+  })
+
+  // Upload content mutation
+  const uploadContentMutation = useMutation({
+    mutationFn: async (data: { title: string; type: string; course_id: number; file: File; description?: string }) => {
+      return await apiClient.uploadContent({
+        title: data.title,
+        type: data.type as any,
+        course_id: data.course_id,
+        file: data.file,
+        description: data.description,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contents'] })
+    },
+  })
+
+  // Rate content mutation
+  const rateContentMutation = useMutation({
+    mutationFn: async ({ id, rating, feedback }: { id: number; rating: number; feedback?: string }) => {
+      return await apiClient.rateContent(id, rating, feedback)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contents'] })
+    },
+  })
+
+  const addContent = (contentData: { title: string; type: string; course: string; file?: File; description?: string }) => {
+    if (!contentData.file) {
+      console.error('File is required for content upload')
+      return
     }
-  }
-
-  const saveContents = (newContents: Content[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newContents))
-      setContents(newContents)
-    } catch (error) {
-      console.error('Error saving contents:', error)
-    }
-  }
-
-  const addContent = (contentData: Omit<Content, 'id' | 'uploadedAt' | 'downloads' | 'rating'>) => {
-    const newContent: Content = {
-      ...contentData,
-      id: Date.now().toString(),
-      uploadedAt: new Date(),
-      downloads: 0,
-      rating: 0,
-    }
-
-    const updatedContents = [newContent, ...contents]
-    saveContents(updatedContents)
-  }
-
-  const updateContent = (id: string, updates: Partial<Content>) => {
-    const updatedContents = contents.map(content => 
-      content.id === id ? { ...content, ...updates } : content
-    )
-    saveContents(updatedContents)
-  }
-
-  const deleteContent = (id: string) => {
-    const updatedContents = contents.filter(content => content.id !== id)
-    saveContents(updatedContents)
-  }
-
-  const incrementDownloads = (id: string) => {
-    updateContent(id, { 
-      downloads: contents.find(c => c.id === id)?.downloads + 1 || 1 
+    
+    uploadContentMutation.mutate({
+      title: contentData.title,
+      type: contentData.type,
+      course_id: 1, // TODO: Get actual course ID
+      file: contentData.file,
+      description: contentData.description,
     })
   }
 
-  const addRating = (id: string, newRating: number) => {
-    const content = contents.find(c => c.id === id)
-    if (!content) return
+  const updateContent = (id: string, updates: Partial<Content>) => {
+    // For now, optimistically update - in real app, you'd have update endpoints
+    const updatedContents = allContents.map(content => 
+      content.id === id ? { ...content, ...updates } : content
+    )
+    queryClient.setQueryData(['contents'], updatedContents)
+  }
 
-    // Simple average calculation
-    const currentRating = content.rating || 0
-    const averageRating = currentRating === 0 ? newRating : (currentRating + newRating) / 2
-    
-    updateContent(id, { rating: Math.round(averageRating * 10) / 10 })
+  const deleteContent = (id: string) => {
+    // Optimistically remove - in real app, you'd have delete endpoint
+    const updatedContents = allContents.filter(content => content.id !== id)
+    queryClient.setQueryData(['contents'], updatedContents)
+  }
+
+  const incrementDownloads = (id: string) => {
+    const content = allContents.find(c => c.id === id)
+    if (content) {
+      updateContent(id, { downloads: content.downloads + 1 })
+    }
+  }
+
+  const addRating = (id: string, newRating: number) => {
+    const numId = parseInt(id)
+    if (!isNaN(numId)) {
+      rateContentMutation.mutate({ id: numId, rating: newRating })
+    }
   }
 
   const getFilteredContents = () => {
-    let filtered = contents
+    let filtered = allContents
 
     // Filter by search query
     if (filters.searchQuery) {
@@ -151,7 +163,7 @@ export function useContentLibrary() {
 
   return {
     contents: getFilteredContents(),
-    allContents: contents,
+    allContents,
     filters,
     isLoading,
     addContent,
@@ -161,5 +173,6 @@ export function useContentLibrary() {
     addRating,
     updateFilters,
     resetFilters,
+    uploadContentMutation,
   }
 }
