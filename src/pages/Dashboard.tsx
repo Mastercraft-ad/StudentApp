@@ -81,9 +81,9 @@ export default function Dashboard() {
             <Trophy className="h-4 w-4 text-primary-green" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.studyStreak} days</div>
+            <div className="text-2xl font-bold">{stats.study_streak} days</div>
             <p className="text-xs text-muted-foreground">
-              {stats.studyStreak > 0 ? 'Keep it up!' : 'Start your streak today!'}
+              {stats.study_streak > 0 ? 'Keep it up!' : 'Start your streak today!'}
             </p>
           </CardContent>
         </Card>
@@ -94,9 +94,9 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-teal" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStudyTime}h</div>
+            <div className="text-2xl font-bold">{stats.total_study_hours}h</div>
             <p className="text-xs text-muted-foreground">
-              {stats.totalStudyTime > 0 ? 'Great progress!' : 'Start studying to track time'}
+              {stats.total_study_hours > 0 ? 'Great progress!' : 'Start studying to track time'}
             </p>
           </CardContent>
         </Card>
@@ -107,9 +107,9 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-primary-green" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.examAverage}%</div>
+            <div className="text-2xl font-bold">{stats.average_exam_score}%</div>
             <p className="text-xs text-muted-foreground">
-              {stats.examAverage > 0 ? 'Keep improving!' : 'Take an exam to see your average'}
+              {stats.average_exam_score > 0 ? 'Keep improving!' : 'Take an exam to see your average'}
             </p>
           </CardContent>
         </Card>

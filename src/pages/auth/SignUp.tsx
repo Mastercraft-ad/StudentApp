@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { apiClient } from '@/services/api'
+import { useNavigate } from 'react-router-dom'
 
 export default function SignUp() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -14,11 +18,42 @@ export default function SignUp() {
     confirmPassword: '',
     agreeToTerms: false
   })
+  const [error, setError] = useState('')
+
+  const registerMutation = useMutation({
+    mutationFn: async (userData: { name: string; email: string; password: string }) => {
+      return await apiClient.register(userData)
+    },
+    onSuccess: (data) => {
+      console.log('Registration successful:', data)
+      navigate('/auth/onboarding')
+    },
+    onError: (error: any) => {
+      console.error('Registration failed:', error)
+      setError(error.response?.data?.message || 'Registration failed. Please try again.')
+    }
+  })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement sign up logic
-    console.log('Sign up:', formData)
+    setError('')
+    
+    // Basic validation
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    
+    if (!formData.agreeToTerms) {
+      setError('Please agree to the terms and conditions')
+      return
+    }
+    
+    registerMutation.mutate({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password
+    })
   }
 
   return (
@@ -41,6 +76,11 @@ export default function SignUp() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
                   Full Name
@@ -140,8 +180,15 @@ export default function SignUp() {
                 </label>
               </div>
 
-              <Button type="submit" className="w-full">
-                Create Account
+              <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+                {registerMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  'Create Account'
+                )}
               </Button>
             </form>
 

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useMutation } from '@tanstack/react-query'
+import { apiClient } from '@/services/api'
 import { 
   Brain, 
   FileText, 
@@ -53,21 +55,96 @@ const aiTools = [
 
 export default function AITools() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
   const [input, setInput] = useState('')
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState('')
+
+  // Mutations for different AI tools
+  const flashcardsMutation = useMutation({
+    mutationFn: async (contentIds: number[]) => {
+      return await apiClient.generateFlashcards(contentIds)
+    },
+    onSuccess: (data) => {
+      setResult({ type: 'flashcards', data })
+      setError('')
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.message || 'Failed to generate flashcards')
+    }
+  })
+
+  const quizMutation = useMutation({
+    mutationFn: async (params: { text?: string }) => {
+      return await apiClient.generateQuiz({ text: params.text })
+    },
+    onSuccess: (data) => {
+      setResult({ type: 'quiz', data })
+      setError('')
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.message || 'Failed to generate quiz')
+    }
+  })
+
+  const summaryMutation = useMutation({
+    mutationFn: async (params: { text: string }) => {
+      return await apiClient.generateSummary({ text: params.text })
+    },
+    onSuccess: (data) => {
+      setResult({ type: 'summary', data })
+      setError('')
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.message || 'Failed to generate summary')
+    }
+  })
+
+  const mindmapMutation = useMutation({
+    mutationFn: async (contentIds: number[]) => {
+      return await apiClient.generateMindmap(contentIds)
+    },
+    onSuccess: (data) => {
+      setResult({ type: 'mindmap', data })
+      setError('')
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.message || 'Failed to generate mindmap')
+    }
+  })
 
   const handleToolSelect = (toolId: string) => {
     setSelectedTool(toolId)
     setInput('')
+    setResult(null)
+    setError('')
   }
 
   const handleGenerate = async () => {
-    setIsProcessing(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsProcessing(false)
-    // TODO: Process with actual AI service
+    if (!input.trim()) {
+      setError('Please enter some content first')
+      return
+    }
+
+    setError('')
+    
+    switch (selectedTool) {
+      case 'flashcards':
+        // For demo, assume content ID 1 - in real app, you'd select from library
+        flashcardsMutation.mutate([1])
+        break
+      case 'quiz':
+        quizMutation.mutate({ text: input })
+        break
+      case 'summary':
+        summaryMutation.mutate({ text: input })
+        break
+      case 'mindmap':
+        mindmapMutation.mutate([1])
+        break
+    }
   }
+
+  const isProcessing = flashcardsMutation.isPending || quizMutation.isPending || summaryMutation.isPending || mindmapMutation.isPending
 
   const renderToolInterface = () => {
     const tool = aiTools.find(t => t.id === selectedTool)
@@ -195,6 +272,13 @@ export default function AITools() {
             )}
           </div>
 
+          {/* Error display */}
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              {error}
+            </div>
+          )}
+
           {/* Generate Button */}
           <div className="flex justify-center">
             <Button 
@@ -216,7 +300,7 @@ export default function AITools() {
             </Button>
           </div>
 
-          {/* Results placeholder */}
+          {/* Results display */}
           {isProcessing && (
             <Card className="border-dashed">
               <CardContent className="p-8 text-center">
@@ -225,6 +309,50 @@ export default function AITools() {
                 <p className="text-sm text-muted-foreground">
                   This usually takes 30-60 seconds depending on content length
                 </p>
+              </CardContent>
+            </Card>
+          )}
+          
+          {result && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Generated {tool.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {result.type === 'summary' && (
+                    <div className="prose max-w-none">
+                      <p>{result.data.content || 'Summary generated successfully!'}</p>
+                    </div>
+                  )}
+                  {result.type === 'quiz' && (
+                    <div>
+                      <h4 className="font-medium mb-2">Quiz Generated</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Quiz with {result.data.questions?.length || 'multiple'} questions created successfully!
+                      </p>
+                    </div>
+                  )}
+                  {result.type === 'flashcards' && (
+                    <div>
+                      <h4 className="font-medium mb-2">Flashcards Generated</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {result.data.length || 'Multiple'} flashcards created successfully!
+                      </p>
+                    </div>
+                  )}
+                  {result.type === 'mindmap' && (
+                    <div>
+                      <h4 className="font-medium mb-2">Mind Map Generated</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Interactive mind map created successfully!
+                      </p>
+                    </div>
+                  )}
+                  <Button onClick={() => setResult(null)} variant="outline">
+                    Generate Another
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

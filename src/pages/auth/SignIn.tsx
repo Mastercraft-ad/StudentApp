@@ -2,20 +2,42 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { apiClient } from '@/services/api'
+import { useNavigate } from 'react-router-dom'
 
 export default function SignIn() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
   })
+  const [error, setError] = useState('')
+
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: { email: string; password: string }) => {
+      return await apiClient.login(credentials)
+    },
+    onSuccess: (data) => {
+      console.log('Login successful:', data)
+      navigate('/dashboard')
+    },
+    onError: (error: any) => {
+      console.error('Login failed:', error)
+      setError(error.response?.data?.message || 'Login failed. Please try again.')
+    }
+  })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement sign in logic
-    console.log('Sign in:', formData)
+    setError('')
+    loginMutation.mutate({
+      email: formData.email,
+      password: formData.password
+    })
   }
 
   return (
@@ -38,6 +60,11 @@ export default function SignIn() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
                   Email Address
@@ -92,8 +119,15 @@ export default function SignIn() {
                 </a>
               </div>
 
-              <Button type="submit" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </Button>
             </form>
 

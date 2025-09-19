@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useContentLibrary } from '@/hooks/useContentLibrary'
-import { useUserStats } from '@/hooks/useUserStats'
 import { 
   Upload, 
   Search, 
@@ -32,69 +31,56 @@ const contentTypes = [
   { id: 'document', label: 'Documents', icon: File },
 ]
 
-const sampleContent = [
-  {
-    id: 1,
-    title: 'Organic Chemistry Chapter 5 - Reaction Mechanisms',
-    type: 'notes',
-    course: 'CHEM 301',
-    uploader: 'Sarah M.',
-    downloads: 245,
-    rating: 4.8,
-    size: '2.3 MB',
-    uploadedAt: '2 days ago',
-    verified: true,
-  },
-  {
-    id: 2,
-    title: 'Calculus II Final Exam - Spring 2024',
-    type: 'past-exams',
-    course: 'MATH 202',
-    uploader: 'Mike Chen',
-    downloads: 892,
-    rating: 4.9,
-    size: '1.8 MB',
-    uploadedAt: '1 week ago',
-    verified: true,
-  },
-  {
-    id: 3,
-    title: 'Biology Practice Problems - Genetics',
-    type: 'questions',
-    course: 'BIO 101',
-    uploader: 'Emma K.',
-    downloads: 156,
-    rating: 4.6,
-    size: '945 KB',
-    uploadedAt: '3 days ago',
-    verified: false,
-  },
-  {
-    id: 4,
-    title: 'Introduction to Algorithms - Lecture Series',
-    type: 'video',
-    course: 'CS 201',
-    uploader: 'Prof. Johnson',
-    downloads: 1240,
-    rating: 4.9,
-    size: '125 MB',
-    uploadedAt: '5 days ago',
-    verified: true,
-  },
-]
 
 export default function ContentLibrary() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedType, setSelectedType] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showUploadModal, setShowUploadModal] = useState(false)
-
-  const filteredContent = sampleContent.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.course.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = selectedType === 'all' || item.type === selectedType
-    return matchesSearch && matchesType
+  const [uploadData, setUploadData] = useState({ 
+    title: '', 
+    course: '', 
+    type: 'notes', 
+    file: null as File | null 
   })
+  
+  const { 
+    contents, 
+    filters, 
+    isLoading, 
+    updateFilters, 
+    addContent, 
+    incrementDownloads,
+    uploadContentMutation
+  } = useContentLibrary()
+
+  const handleUpload = () => {
+    if (uploadData.title && uploadData.course && uploadData.file) {
+      addContent({
+        title: uploadData.title,
+        type: uploadData.type,
+        course: uploadData.course,
+        file: uploadData.file
+      })
+      setShowUploadModal(false)
+      setUploadData({ title: '', course: '', type: 'notes', file: null })
+    }
+  }
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setUploadData(prev => ({ ...prev, file }))
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="text-lg font-medium">Loading content library...</div>
+        </div>
+      </div>
+    )
+  }
 
   const getTypeIcon = (type: string) => {
     const typeConfig = contentTypes.find(t => t.id === type)
@@ -124,8 +110,8 @@ export default function ContentLibrary() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by title, course, or topic..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={filters.searchQuery}
+                onChange={(e) => updateFilters({ searchQuery: e.target.value })}
                 className="pl-10"
               />
             </div>
@@ -168,9 +154,9 @@ export default function ContentLibrary() {
               return (
                 <Button
                   key={type.id}
-                  variant={selectedType === type.id ? 'default' : 'outline'}
+                  variant={filters.selectedType === type.id ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedType(type.id)}
+                  onClick={() => updateFilters({ selectedType: type.id })}
                   className="flex items-center space-x-2"
                 >
                   <Icon className="h-4 w-4" />
@@ -183,62 +169,92 @@ export default function ContentLibrary() {
       </Card>
 
       {/* Content Grid/List */}
-      <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-        {filteredContent.map((item) => {
-          const TypeIcon = getTypeIcon(item.type)
-          return (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2">
-                    <TypeIcon className="h-5 w-5 text-primary-green" />
-                    {item.verified && (
-                      <div className="w-2 h-2 bg-primary-green rounded-full" title="Verified Content" />
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{item.uploadedAt}</div>
-                </div>
-                <CardTitle className="text-lg leading-tight">{item.title}</CardTitle>
-                <CardDescription>
-                  <div className="flex items-center justify-between">
-                    <span>{item.course}</span>
-                    <span className="text-xs">{item.size}</span>
-                  </div>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">by {item.uploader}</span>
-                    <div className="flex items-center space-x-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span>{item.rating}</span>
+      {contents.length === 0 ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="font-medium mb-2">No content found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {filters.searchQuery ? 'No content matches your search criteria.' : 'Be the first to upload study materials!'}
+            </p>
+            <Button onClick={() => setShowUploadModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Upload First Content
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+          {contents.map((item) => {
+            const TypeIcon = getTypeIcon(item.type)
+            const formatDate = (dateString: string) => {
+              const date = new Date(dateString)
+              return date.toLocaleDateString()
+            }
+            
+            return (
+              <Card key={item.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      <TypeIcon className="h-5 w-5 text-primary-green" />
+                      {item.is_verified && (
+                        <div className="w-2 h-2 bg-primary-green rounded-full" title="Verified Content" />
+                      )}
                     </div>
+                    <div className="text-xs text-muted-foreground">{formatDate(item.created_at)}</div>
                   </div>
-                  
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Download className="h-4 w-4" />
-                      <span>{item.downloads} downloads</span>
+                  <CardTitle className="text-lg leading-tight">{item.title}</CardTitle>
+                  <CardDescription>
+                    <div className="flex items-center justify-between">
+                      <span>{item.course?.name || 'Unknown Course'}</span>
+                      <span className="text-xs">
+                        {item.file_size ? `${Math.round(item.file_size / 1024)} KB` : 'N/A'}
+                      </span>
                     </div>
-                  </div>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        by {item.uploader?.name || 'Unknown'}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <span>{item.average_rating.toFixed(1)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center space-x-1">
+                        <Download className="h-4 w-4" />
+                        <span>{item.downloads_count} downloads</span>
+                      </div>
+                    </div>
 
-                  <div className="flex gap-2">
-                    <Button size="sm" className="flex-1">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Preview
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => incrementDownloads(item.id.toString())}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       {/* Upload Modal Placeholder */}
       {showUploadModal && (
