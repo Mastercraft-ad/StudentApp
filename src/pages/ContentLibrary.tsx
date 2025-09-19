@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useContentLibrary } from '@/hooks/useContentLibrary'
+import { useUserStats } from '@/hooks/useUserStats'
 import { 
   Upload, 
   Search, 
@@ -16,7 +18,9 @@ import {
   Grid,
   List,
   SortAsc,
-  Eye
+  Eye,
+  Trash2,
+  FolderOpen
 } from 'lucide-react'
 
 const contentTypes = [
