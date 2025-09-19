@@ -1,0 +1,351 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  INSTITUTION
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+  INSTITUTION
+}
+
+enum ContentType {
+  PDF
+  PPT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model User {
+  id                    Int                     @id @default(autoincrement())
+  email                 String                  @unique
+  password              String
+  firstName             String?
+  lastName              String?
+  role                  UserRole                @default(STUDENT)
+  isVerified            Boolean                 @default(false)
+  subscriptionTier      SubscriptionTier        @default(FREE)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  
+  // Onboarding fields
+  program               String?
+  currentLevel          String?
+  discoverySource       String?
+  goals                 Json?
+  institutionId         Int?
+  institution           Institution?            @relation(fields: [institutionId], references: [id])
+  
+  // Relations
+  contents              Content[]
+  contentRatings        ContentRating[]
+  exams                 Exam[]
+  examAttempts          ExamAttempt[]
+  learningPaths         LearningPath[]
+  spacedRepetitionItems SpacedRepetitionItem[]
+  subscriptions         Subscription[]
+  
+  @@map("users")
+}
+
+model Institution {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String?  @unique
+  country     String?
+  type        String?  // University, College, High School, etc.
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  users       User[]
+  courses     Course[]
+  
+  @@map("institutions")
+}
+
+model Course {
+  id            Int         @id @default(autoincrement())
+  name          String
+  code          String?
+  description   String?
+  institutionId Int
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  contents      Content[]
+  exams         Exam[]
+  learningPaths LearningPath[]
+  
+  @@unique([code, institutionId])
+  @@map("courses")
+}
+
+model Content {
+  id              Int             @id @default(autoincrement())
+  title           String
+  type            ContentType
+  description     String?
+  fileUrl         String
+  fileName        String
+  fileSize        Int?
+  metadata        Json?
+  uploaderId      Int
+  courseId        Int
+  isPublic        Boolean         @default(true)
+  averageRating   Float?
+  totalRatings    Int             @default(0)
+  downloadCount   Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relations
+  uploader        User            @relation(fields: [uploaderId], references: [id])
+  course          Course          @relation(fields: [courseId], references: [id])
+  ratings         ContentRating[]
+  flashcards      Flashcard[]
+  quizzes         Quiz[]
+  summaries       Summary[]
+  mindmaps        MindMap[]
+  
+  @@map("contents")
+}
+
+model ContentRating {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // 1-5 stars
+  feedback  String?
+  userId    Int
+  contentId Int
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  content   Content  @relation(fields: [contentId], references: [id])
+  
+  @@unique([userId, contentId])
+  @@map("content_ratings")
+}
+
+model Flashcard {
+  id          Int                    @id @default(autoincrement())
+  front       String
+  back        String
+  difficulty  Int?                   @default(1)
+  contentId   Int?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  
+  // Relations
+  content     Content?               @relation(fields: [contentId], references: [id])
+  spacedItems SpacedRepetitionItem[]
+  
+  @@map("flashcards")
+}
+
+model Quiz {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String?
+  questions   Json         // Array of question objects
+  contentId   Int?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  // Relations
+  content     Content?     @relation(fields: [contentId], references: [id])
+  examAttempts ExamAttempt[]
+  
+  @@map("quizzes")
+}
+
+model Summary {
+  id            Int      @id @default(autoincrement())
+  title         String
+  content       String
+  keyPoints     Json?    // Array of key points
+  contentId     Int?
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  sourceContent Content? @relation(fields: [contentId], references: [id])
+  
+  @@map("summaries")
+}
+
+model MindMap {
+  id          Int      @id @default(autoincrement())
+  title       String
+  nodes       Json     // Node structure for react-flow
+  edges       Json     // Edge structure for react-flow
+  contentId   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  content     Content? @relation(fields: [contentId], references: [id])
+  
+  @@map("mindmaps")
+}
+
+model Exam {
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?
+  duration    Int           // Duration in minutes
+  questions   Json          // Array of question objects
+  status      ExamStatus    @default(DRAFT)
+  isPublic    Boolean       @default(false)
+  creatorId   Int
+  courseId    Int?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  creator     User          @relation(fields: [creatorId], references: [id])
+  course      Course?       @relation(fields: [courseId], references: [id])
+  attempts    ExamAttempt[]
+  
+  @@map("exams")
+}
+
+model ExamAttempt {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  examId          Int?
+  quizId          Int?
+  answers         Json     // User's answers
+  score           Float?
+  timeSpent       Int?     // Time spent in seconds
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  exam            Exam?    @relation(fields: [examId], references: [id])
+  quiz            Quiz?    @relation(fields: [quizId], references: [id])
+  
+  @@map("exam_attempts")
+}
+
+model LearningPath {
+  id             Int                 @id @default(autoincrement())
+  title          String
+  description    String?
+  targetExamDate DateTime?
+  userId         Int
+  courseId       Int?
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  
+  // Relations
+  user           User                @relation(fields: [userId], references: [id])
+  course         Course?             @relation(fields: [courseId], references: [id])
+  tasks          LearningPathTask[]
+  
+  @@map("learning_paths")
+}
+
+model LearningPathTask {
+  id               Int           @id @default(autoincrement())
+  title            String
+  description      String?
+  dueDate          DateTime?
+  status           TaskStatus    @default(PENDING)
+  estimatedTime    Int?          // Time in minutes
+  learningPathId   Int
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  
+  // Relations
+  learningPath     LearningPath  @relation(fields: [learningPathId], references: [id])
+  
+  @@map("learning_path_tasks")
+}
+
+model SpacedRepetitionItem {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  flashcardId  Int
+  easiness     Float     @default(2.5)
+  interval     Int       @default(1)
+  repetitions  Int       @default(0)
+  nextReview   DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  user         User      @relation(fields: [userId], references: [id])
+  flashcard    Flashcard @relation(fields: [flashcardId], references: [id])
+  
+  @@unique([userId, flashcardId])
+  @@map("spaced_repetition_items")
+}
+
+model SubscriptionPlan {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  tier          SubscriptionTier
+  price         Float
+  currency      String         @default("USD")
+  interval      String         // monthly, yearly
+  features      Json           // Array of features
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Relations
+  subscriptions Subscription[]
+  
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id              Int              @id @default(autoincrement())
+  userId          Int
+  planId          Int
+  status          String           // active, canceled, past_due, etc.
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean       @default(false)
+  paymentIntentId    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // Relations
+  user            User             @relation(fields: [userId], references: [id])
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  
+  @@map("subscriptions")
+}
